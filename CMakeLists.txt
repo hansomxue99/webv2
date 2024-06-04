@@ -5,4 +5,5 @@ set(CMAKE_CXX_STANDARD 11)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_executable(test ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/a.cpp)
+add_executable(test ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/test_log.cpp
+${CMAKE_CURRENT_SOURCE_DIR}/src/test_threadpool.cpp)

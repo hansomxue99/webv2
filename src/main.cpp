@@ -9,12 +9,14 @@ void initialize_logger() {
 }
 
 void print();
+void test_threadpool();
 
 int main()
 {
     initialize_logger();
     spdlog::info("initial...");
     print();
+    test_threadpool();
     spdlog::drop_all();
     return 0;
 }
