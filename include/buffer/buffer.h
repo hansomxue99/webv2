@@ -40,6 +40,10 @@ public:
         m_writepos = 0;
     }
 
+    void retrieveUtil(const char* end) {
+        retrieve(end - begin_read());
+    }
+
     void retrieve(size_t len) {
         if (len <= readable_bytes()) {
             m_readpos += len;
