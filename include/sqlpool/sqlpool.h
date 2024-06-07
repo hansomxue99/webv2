@@ -7,9 +7,13 @@
 
 class SqlPool {
 public:
-    static SqlPool& getInstance(const std::string& host, const std::string& user, const std::string& passwd,
-            const std::string& dbname, int port, int max_conn = 10) {
-        static SqlPool instance(host, user, passwd, dbname, port, max_conn);
+    static void init(const std::string& host, const std::string& user, const std::string& passwd,
+                     const std::string& dbname, int port, int max_conn = 10) {
+        getInstance().initilization(host, user, passwd, dbname, port, max_conn);
+    }
+
+    static SqlPool& getInstance() {
+        static SqlPool instance;
         return instance;
     }
 
@@ -29,7 +33,7 @@ public:
     
 
 private:
-    SqlPool(const std::string& host, const std::string& user, const std::string& passwd,
+    void initilization(const std::string& host, const std::string& user, const std::string& passwd,
             const std::string& dbname, int port, int max_conn = 10) {
         for (int i = 0; i < max_conn; ++i) {
             MYSQL* conn = mysql_init(nullptr);
@@ -43,6 +47,8 @@ private:
             m_connque.push(conn);
         }
     }
+
+    SqlPool() = default;
 
     ~SqlPool() {
         while (!m_connque.empty()) {
