@@ -6,6 +6,8 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <cassert>
+#include "sqlpool/sqlpool.h"
+#include <iostream>
 
 class HttpRequest {
 public:
@@ -124,12 +126,49 @@ private:
 
         spdlog::debug("Register or Login Verify. Name : {}, PWD: {}", name, pwd);
 
-        if (!islogin) { // register
-            spdlog::debug("Register...");
-        } else {
-            spdlog::debug("Login...");
+        char sql_commad[256] = {0};
+
+        // mysql interaction
+        SqlPool& sqlpool = SqlPool::getInstance();
+        auto conn = sqlpool.getConnection();
+        snprintf(sql_commad, 256, "SELECT * FROM user WHERE username='%s' LIMIT 1", name.c_str());
+        int ret = mysql_query(conn.get(), sql_commad);
+        
+        
+        if (ret) {
+            if (islogin) {
+                spdlog::error("Login Verify Failure! Unknown Name {} !", name.c_str());
+                return false;
+            }
+            // register
+            spdlog::debug("Now Register...");
+            bzero(sql_commad, 256);
+            snprintf(sql_commad, 256, "SELECT into user(username, passwd) VALUES('%s', '%s')", name.c_str(), pwd.c_str());
+            if (mysql_query(conn.get(), sql_commad)) {
+                spdlog::error("Register Failure! Insertion Failure!");
+                return false;
+            }
+            spdlog::debug("Register Verifying Success!");
+            return true;
         }
-        spdlog::debug("Register or Login Verifying Success!");
+
+        if (!islogin) {
+            spdlog::error("Register Verify Failure! Repeated Name {} !", name.c_str());
+            return false;
+        }
+
+        // login
+        spdlog::debug("Now Login...");
+        MYSQL_RES* res = mysql_store_result(conn.get());
+        while (MYSQL_ROW row = mysql_fetch_row(res)) {
+            spdlog::info("==> mysql user-db {} : {}", row[0], row[1]);
+            std::string passwd(row[1]);
+            if (pwd != passwd) {
+                spdlog::error("Login Verify Failure! Error Password !");
+                return false;
+            }
+            spdlog::debug("Login Verifying Success!");
+        }
         return true;
     }
 
