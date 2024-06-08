@@ -9,6 +9,25 @@
 
 class HttpResponse {
 public:
+    HttpResponse() : m_status_message("") {}
+    ~HttpResponse() {
+        if (m_file_memory) {
+            munmap(m_file_memory, m_sendfile_len);
+            m_file_memory = nullptr;
+        }
+    }
+
+    void init(const std::string& srcDir, const std::string& path, bool isalive, int code) {
+        if (m_file_memory) {
+            munmap(m_file_memory, m_sendfile_len);
+            m_file_memory = nullptr;
+        }
+        m_status_code = -1;
+        m_sendfile_len = 0;
+        m_srcDir = srcDir;
+        m_path = path;
+    }
+
     void response(DynamicBuffer& buff) {
         check_status();
 
@@ -105,6 +124,7 @@ private:
         m_file_memory = (char *)mmret;
         close(fd);
         std::string body;
+        m_sendfile_len = file_stat.st_size;
         body += "Content-length: " + std::to_string(file_stat.st_size) + "\r\n\r\n";
         buff.append(body.c_str(), body.size());
     }
@@ -117,6 +137,7 @@ private:
     std::string m_path;
     std::string m_srcDir;
     char *m_file_memory;
+    int m_sendfile_len;
 
     static const std::unordered_map<std::string, std::string> SUFFIX_TYPE;
 };
