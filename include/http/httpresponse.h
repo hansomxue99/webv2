@@ -126,6 +126,7 @@ private:
         std::string body;
         m_sendfile_len = file_stat.st_size;
         body += "Content-length: " + std::to_string(file_stat.st_size) + "\r\n\r\n";
+        spdlog::debug("Body lines to be appended are {}. Attention: file contents is mapped to memory.", body);
         buff.append(body.c_str(), body.size());
     }
 
