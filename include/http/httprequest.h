@@ -59,6 +59,11 @@ public:
         spdlog::debug("request success parsed: {}, {}, {}", m_method, m_path, m_version);
         return true;
     }
+
+    // path interface for response
+    const std::string& get_response_path() {
+        return m_path;
+    }
 private:
     void parse_httppath() {
         if (m_path == "/") {
