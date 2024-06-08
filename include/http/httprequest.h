@@ -61,8 +61,16 @@ public:
     }
 
     // path interface for response
-    const std::string& get_response_path() {
+    const std::string& get_response_path() const {
         return m_path;
+    }
+
+    // keep alive interface for response
+    bool is_response_alive() const {
+        if (m_headers.count("Connection")) {
+            return m_headers.find("Connection")->second == "keep-alive" && m_version == "1.1";
+        }
+        return false;
     }
 private:
     void parse_httppath() {
