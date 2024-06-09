@@ -1,3 +1,5 @@
+#pragma once
+
 #include "mysql/mysql.h"
 #include "spdlog/spdlog.h"
 #include <string>
