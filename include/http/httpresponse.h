@@ -1,3 +1,5 @@
+#pragma once
+
 #include "spdlog/spdlog.h"
 #include "buffer/buffer.h"
 #include <string>
@@ -40,6 +42,15 @@ public:
         // add body line
         append_body_line(buff);
     }
+
+    // interactions
+    int get_file_len() const {
+        return m_sendfile_len;
+    }
+
+    char* get_file() const {
+        return m_file_memory;
+    }
 private:
     std::string get_status_message(int code) {
         switch (code) {
@@ -62,19 +73,22 @@ private:
         std::string full_path = m_srcDir + m_path;
         spdlog::debug("Checking status, current full path is {}.", full_path);
         if (stat((full_path).c_str(), &file_stat) != 0) {
+            m_status_code = 404;
             m_status_message = get_status_message(404); // not found
             return;
         }
         if (!(file_stat.st_mode & S_IROTH)) {
+            m_status_code = 403;
             m_status_message = get_status_message(403); // forbidden
             return;
         }
+        m_status_code = 200;
         m_status_message = get_status_message(200); // ok
     }
 
     void append_status_line(DynamicBuffer& buff) {
         std::string s = "HTTP/1.1 " + std::to_string(m_status_code) + " " + m_status_message + "\r\n";
-        spdlog::debug("Status line to be appended is {}.", s);
+        spdlog::debug("Status line to be appended is {}", s);
         buff.append(s.c_str(), s.size());
     }
 
@@ -102,7 +116,7 @@ private:
         };
 
         s += "Connect-type: " + get_filetype() + "\r\n";
-        spdlog::debug("Header lines to be appended are {}.", s);
+        spdlog::debug("Header lines to be appended are \r\n{}", s);
         buff.append(s.c_str(), s.size());
     }
 
@@ -126,7 +140,7 @@ private:
         std::string body;
         m_sendfile_len = file_stat.st_size;
         body += "Content-length: " + std::to_string(file_stat.st_size) + "\r\n\r\n";
-        spdlog::debug("Body lines to be appended are {}. Attention: file contents is mapped to memory.", body);
+        spdlog::debug("Body lines to be appended are\r\n {}Attention: file contents is mapped to memory.", body);
         buff.append(body.c_str(), body.size());
     }
 
