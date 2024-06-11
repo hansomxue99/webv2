@@ -79,7 +79,10 @@ private:
         if (m_path == "/") {
             m_path = "/index.html";
         } else {
-            m_path += ".html";
+            // m_path += ".html";
+            if (DEFAULT_HTML.find(m_path) != DEFAULT_HTML.end()) {
+                m_path += ".html";
+            }
         }
     }
 
@@ -242,5 +245,5 @@ const std::unordered_map<std::string, int> HttpRequest::DEFAULT_TAG {
 
 const std::unordered_set<std::string> HttpRequest::DEFAULT_HTML {
     "/index", "/register", "/login",
-    "/welcome", "/video", "picture"
+    "/welcome", "/video", "/picture"
 };

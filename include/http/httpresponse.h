@@ -11,23 +11,19 @@
 
 class HttpResponse {
 public:
-    HttpResponse() : m_status_message("") {}
+    HttpResponse() : m_status_message(""), m_status_code(-1), is_alive(false) {}
     ~HttpResponse() {
-        if (m_file_memory) {
-            munmap(m_file_memory, m_sendfile_len);
-            m_file_memory = nullptr;
-        }
+        unmap_file();
     }
 
     void init(const std::string& srcDir, const std::string& path, bool isalive, int code) {
-        if (m_file_memory) {
-            munmap(m_file_memory, m_sendfile_len);
-            m_file_memory = nullptr;
-        }
-        m_status_code = -1;
-        m_sendfile_len = 0;
+        unmap_file();
+        m_status_code = code;
+        mm_filestat = { 0 };
         m_srcDir = srcDir;
         m_path = path;
+        is_alive = isalive;
+        m_file_memory = nullptr;
     }
 
     void response(DynamicBuffer& buff) {
@@ -45,11 +41,18 @@ public:
 
     // interactions
     int get_file_len() const {
-        return m_sendfile_len;
+        return mm_filestat.st_size;
     }
 
     char* get_file() const {
         return m_file_memory;
+    }
+
+    void unmap_file() {
+        if (m_file_memory) {
+            munmap(m_file_memory, mm_filestat.st_size);
+            m_file_memory = nullptr;
+        }
     }
 private:
     std::string get_status_message(int code) {
@@ -69,15 +72,14 @@ private:
             return;
         }
 
-        struct stat file_stat;
         std::string full_path = m_srcDir + m_path;
-        spdlog::debug("Checking status, current full path is {}.", full_path);
-        if (stat((full_path).c_str(), &file_stat) != 0) {
+        spdlog::debug("Checking status, current full path is {}", full_path);
+        if (stat((full_path).c_str(), &mm_filestat) < 0 || S_ISDIR(mm_filestat.st_mode)) {
             m_status_code = 404;
             m_status_message = get_status_message(404); // not found
             return;
         }
-        if (!(file_stat.st_mode & S_IROTH)) {
+        if (!(mm_filestat.st_mode & S_IROTH)) {
             m_status_code = 403;
             m_status_message = get_status_message(403); // forbidden
             return;
@@ -88,13 +90,13 @@ private:
 
     void append_status_line(DynamicBuffer& buff) {
         std::string s = "HTTP/1.1 " + std::to_string(m_status_code) + " " + m_status_message + "\r\n";
-        spdlog::debug("Status line to be appended is {}", s);
-        buff.append(s.c_str(), s.size());
+        spdlog::debug("Status line to be appended is\r\n{}", s);
+        buff.append(s.data(), s.length());
     }
 
     void append_header_line(DynamicBuffer& buff) {
         std::string s;
-        s = "Connnection: ";
+        s = "Connection: ";
         if (is_alive) {
             s += "keep-alive\r\n";
             s += "keep-alive: max=6, timeout=120\r\n";
@@ -115,9 +117,23 @@ private:
             return default_ret;
         };
 
-        s += "Connect-type: " + get_filetype() + "\r\n";
-        spdlog::debug("Header lines to be appended are \r\n{}", s);
-        buff.append(s.c_str(), s.size());
+        s += "Content-type: " + get_filetype() + "\r\n";
+        spdlog::debug("Header lines to be appended are\r\n{}", s);
+        buff.append(s.data(), s.length());
+    }
+
+    void send_error_content(DynamicBuffer& buff, const std::string& message) {
+        std::string body;
+        std::string prefix;
+        body += "<html><title>Error</title>";
+        body += "<body bgcolor=\"ffffff\">";
+        body += std::to_string(m_status_code) + " : " + m_status_message  + "\n";
+        body += "<p>" + message + "</p>";
+        body += "<hr><em>TinyWebServer</em></body></html>";
+
+        prefix = "Content-length: " + std::to_string(body.size()) + "\r\n\r\n";
+        buff.append(prefix.data(), prefix.length());
+        buff.append(body.data(), body.length());
     }
 
     void append_body_line(DynamicBuffer& buff) {
@@ -125,23 +141,23 @@ private:
         int fd = open(full_path.data(), O_RDONLY);
         if (fd < 0) {
             spdlog::error("Error: add body line error! The file to be open is {}, Not found!", full_path);
+            send_error_content(buff, "File Not Found");
             return;
         }
-        spdlog::debug("Adding Body Line, current file path is {}.", full_path);
-        struct stat file_stat;
-        stat(full_path.data(), &file_stat);
-        int *mmret = (int *)mmap(0, file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+        spdlog::debug("Adding Body Line, current file path is {}", full_path);
+        int *mmret = (int *)mmap(0, mm_filestat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
         if (*mmret == -1) {
             spdlog::error("Error: add body line error! mmap Error, Please check!");
+            send_error_content(buff, "File Not Found");
+            close(fd);
             return;
         }
         m_file_memory = (char *)mmret;
         close(fd);
         std::string body;
-        m_sendfile_len = file_stat.st_size;
-        body += "Content-length: " + std::to_string(file_stat.st_size) + "\r\n\r\n";
-        spdlog::debug("Body lines to be appended are\r\n {}Attention: file contents is mapped to memory.", body);
-        buff.append(body.c_str(), body.size());
+        body += "Content-length: " + std::to_string(mm_filestat.st_size) + "\r\n\r\n";
+        spdlog::debug("Body lines to be appended are\r\n{}Attention: file contents is mapped to memory.", body);
+        buff.append(body.data(), body.length());
     }
 
     
@@ -152,15 +168,29 @@ private:
     std::string m_path;
     std::string m_srcDir;
     char *m_file_memory;
-    int m_sendfile_len;
+    struct stat mm_filestat;
 
     static const std::unordered_map<std::string, std::string> SUFFIX_TYPE;
 };
 
 const std::unordered_map<std::string, std::string> HttpResponse::SUFFIX_TYPE {
-    {".html", "text/html"}, {".xml", "text/xml"},
-    {".xhtml", "application/xhtml+xml"}, {".text", "text/plain"},
-    {".png", "image/png"}, {".gif", "image/gif"},
-    {".jpg", "image/jpg"}, {"jpeg", "image/jpeg"},
-    {".avi", "video/x-msvideo"}
+    { ".html",  "text/html" },
+    { ".xml",   "text/xml" },
+    { ".xhtml", "application/xhtml+xml" },
+    { ".txt",   "text/plain" },
+    { ".rtf",   "application/rtf" },
+    { ".pdf",   "application/pdf" },
+    { ".word",  "application/nsword" },
+    { ".png",   "image/png" },
+    { ".gif",   "image/gif" },
+    { ".jpg",   "image/jpeg" },
+    { ".jpeg",  "image/jpeg" },
+    { ".au",    "audio/basic" },
+    { ".mpeg",  "video/mpeg" },
+    { ".mpg",   "video/mpeg" },
+    { ".avi",   "video/x-msvideo" },
+    { ".gz",    "application/x-gzip" },
+    { ".tar",   "application/x-tar" },
+    { ".css",   "text/css "},
+    { ".js",    "text/javascript "},
 };
