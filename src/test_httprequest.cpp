@@ -34,7 +34,7 @@ void test_httprequest_post() {
     assert(fd >= 0);
 
     // 写入初始数据到文件
-    const char* initial_data = "POST /login HTTP/1.1\r\nHost:baidu.com\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 137\r\nConnection: close\r\n\r\nusername=wg&password=123456";
+    const char* initial_data = "POST /login HTTP/1.1\r\nHost:baidu.com\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 137\r\nConnection: close\r\n\r\nusername=name&password=passwd";
     size_t initial_data_len = strlen(initial_data);
     ssize_t written = write(fd, initial_data, initial_data_len);
 
