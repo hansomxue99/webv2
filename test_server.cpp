@@ -22,7 +22,7 @@ void server() {
         request.write_response(200, response, "image/png");
     });
     // fmt::println("正在监听：http://127.0.0.1:8080");
-    server->do_start("172.22.155.121", "3389");
+    server->do_start("0.0.0.0", "8080");
 
     ctx.join();
 }
